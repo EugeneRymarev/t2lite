@@ -1,0 +1,15 @@
+# Переводы строк: в репозитории всегда LF, а Windows-скрипты на диске — CRLF.
+* text=auto
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+# Двоичные файлы не трогать
+*.jar binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.jks binary
+*.keystore binary
+*.apk binary

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">t2 Lite: баланс и остатки</string>
+    <string name="widget_description">Сколько доплатить до списания и остатки по тарифу</string>
+    <string name="widget_settings_title">Настройки виджета</string>
+</resources>

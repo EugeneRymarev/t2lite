@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Напоминания о пополнении баланса (ru.myt2lite.reminder), Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Имена звонивших из телефонной книги в звонках помощнику (ru.myt2lite.voice.ContactNames) -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- «Салоны связи»: кнопка «рядом со мной» на карте (ru.myt2lite.offices), спрашивается только по нажатию -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!--
+        Безопасность:
+        - allowBackup=false + dataExtractionRules: данные приложения (вход, номер, кэш) не уходят
+          в облачную копию Google, не снимаются через adb backup и не переносятся на другой телефон;
+        - usesCleartextTraffic=false: только защищённые соединения (https), и в WebView тоже.
+    -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.T2Lite"
+        tools:targetApi="31">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.T2Lite">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".chat.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Звонки голосового помощника: расшифровка и запись (ru.myt2lite.voice) -->
+        <activity
+            android:name=".voice.VoiceAssistantActivity"
+            android:exported="false"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Финансы: списания, пополнения, выписка на почту (ru.myt2lite.finance) -->
+        <activity
+            android:name=".finance.FinanceActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Вопросы и ответы: темы, статьи, поиск ответа (ru.myt2lite.help) -->
+        <activity
+            android:name=".help.HelpActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Мои заявки: обращения в поддержку и салоны, статус и ответ (ru.myt2lite.issues) -->
+        <activity
+            android:name=".issues.IssuesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- История версий: что нового в каждой версии (ru.myt2lite.changelog, текст — assets/changelog.md) -->
+        <activity
+            android:name=".changelog.ChangelogActivity"
+            android:exported="false"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Салоны связи t2: сайт t2.ru/offices внутри приложения, как в оригинале (ru.myt2lite.offices) -->
+        <activity
+            android:name=".offices.OfficesActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.T2Lite" />
+        <!-- Виджет: баланс, доплата до списания, остатки (ru.myt2lite.widget) -->
+        <receiver
+            android:name=".widget.T2WidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/t2_widget_info" />
+        </receiver>
+        <activity
+            android:name=".widget.WidgetSettingsActivity"
+            android:exported="true"
+            android:label="@string/widget_settings_title"
+            android:theme="@style/Theme.T2Lite">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,136 @@
+# Выпуск новой версии.
+# Запускается сам, когда на GitHub отправлен тег вида v1.1.12:
+#   собирает подписанный APK, берёт текст «что нового» из app/src/main/assets/changelog.md
+#   и публикует релиз с файлом APK на странице Releases.
+# Для подписи нужны 4 секрета репозитория (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD — их добавляет github-secrets.bat.
+name: Релиз
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # нужно, чтобы создать релиз и загрузить в него APK
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Скачать код
+        uses: actions/checkout@v5
+
+      - name: Проверить номер версии
+        run: |
+          VERSION_NAME=$(grep -E '^VERSION_NAME=' version.properties | cut -d= -f2 | tr -d '\r[:space:]')
+          VERSION_CODE=$(grep -E '^VERSION_CODE=' version.properties | cut -d= -f2 | tr -d '\r[:space:]')
+          if [ "${TAG#v}" != "$VERSION_NAME" ]; then
+            echo "::error::Тег $TAG не совпадает с версией в version.properties ($VERSION_NAME). Поставьте тег v$VERSION_NAME."
+            exit 1
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Версия $VERSION_NAME (build $VERSION_CODE)"
+
+      - name: Взять список изменений из changelog.md
+        run: |
+          # Раздел «## 1.1.12 · build 18 · дата» до следующего «## ». Строки-комментарии «#» пропускаем.
+          section() {
+            awk -v head="$1" '
+              { sub(/\r$/, "") }
+              /^## / { if (found) exit; if ($0 == head || index($0, head " ") == 1) { found = 1; next } }
+              found && !/^#/ { print }
+            ' app/src/main/assets/changelog.md | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}'
+          }
+          NOTES=$(section "## $VERSION_NAME")
+          if [ -z "$NOTES" ]; then
+            echo "::warning::В changelog.md нет раздела «## $VERSION_NAME». Беру строки из «## Готовится»."
+            NOTES=$(section "## Готовится")
+          fi
+          [ -z "$NOTES" ] && NOTES="- Мелкие исправления"
+          printf '## Что нового\n\n%s\n' "$NOTES" > release-notes.md
+          cat release-notes.md
+
+      - name: Установить Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Подготовить Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Положить ключ подписи из секретов
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Не заданы секреты для подписи (KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD). Запустите github-secrets.bat на компьютере, где лежит ключ, — см. README."
+            exit 1
+          fi
+          clean() { printf '%s' "$1" | tr -d '\r\n'; }
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > keystore/t2lite-release.jks
+          {
+            echo "storeFile=keystore/t2lite-release.jks"
+            echo "storePassword=$(clean "$KEYSTORE_PASSWORD")"
+            echo "keyAlias=$(clean "$KEY_ALIAS")"
+            echo "keyPassword=$(clean "$KEY_PASSWORD")"
+          } > keystore.properties
+
+      - name: Собрать APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+
+      - name: Проверить подпись
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)/apksigner"
+          CERTS=$("$APKSIGNER" verify --print-certs "$APK")
+          echo "$CERTS" | grep -E 'certificate (DN|SHA-256)'
+          if echo "$CERTS" | grep -q 'CN=Android Debug'; then
+            echo "::error::APK подписан отладочным ключом, а не ключом из секретов. Проверьте KEYSTORE_BASE64 и пароли."
+            exit 1
+          fi
+          mkdir -p dist
+          OUT="dist/t2lite-$VERSION_NAME-build$VERSION_CODE.apk"
+          cp "$APK" "$OUT"
+          echo "APK_FILE=$OUT" >> "$GITHUB_ENV"
+
+      - name: Опубликовать релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NAME=$(basename "$APK_FILE")
+          SHA=$(sha256sum "$APK_FILE" | cut -d' ' -f1)
+          cat >> release-notes.md <<NOTES
+
+          ---
+          **Как установить:** скачайте \`$NAME\` ниже (раздел Assets) и откройте его на телефоне.
+          Сборка для телефонов с 64-битным процессором (arm64) — это почти все телефоны последних лет.
+          Новая версия ставится поверх старой, данные и вход сохраняются.
+
+          SHA-256: \`$SHA\`
+          NOTES
+          TITLE="t2 Lite $VERSION_NAME (build $VERSION_CODE)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_FILE" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "$APK_FILE" --title "$TITLE" --notes-file release-notes.md --verify-tag
+          fi
+
+      - name: Убрать ключ с сервера сборки
+        if: always()
+        run: rm -f keystore/t2lite-release.jks keystore.properties

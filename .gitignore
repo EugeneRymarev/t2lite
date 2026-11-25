@@ -1,0 +1,53 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/dist
+/keystore
+keystore.properties
+
+# --- Секреты и подпись: никогда не коммитить ---
+# Ключи подписи и пароли к ним (build.ps1 создаёт keystore/t2lite-release.jks и keystore.properties)
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+keystore*.properties
+signing*.properties
+secrets*.properties
+.env
+.env.*
+google-services.json
+
+# --- Собранные приложения и отчёты сборки ---
+*.apk
+*.aab
+*.ap_
+*.dex
+/app/release
+/app/debug
+/app/build/
+**/build/
+.kotlin/
+*.hprof
+*.log
+
+# --- Перехваты трафика и дампы (в них бывают токены, номер и SMS-коды) ---
+/captures
+*.har
+*.pcap
+*.pcapng
+*.mitm
+*.flow
+*.saz
+*.trace
+logcat*.txt
